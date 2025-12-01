@@ -14,53 +14,57 @@ st.set_page_config(
 )
 
 # ================================================================
-# 2. CUSTOM THEME + CSS
+# 2. CUSTOM THEME + CSS  (FIXED TEXT VISIBILITY)
 # ================================================================
 st.markdown("""
 <style>
-/* Smooth UI */
+
+/* Global Font */
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
 }
 
-/* Page background */
+/* Background */
 .stApp {
     background: linear-gradient(135deg, #e0e7ff 0%, #fdf2f8 100%);
 }
 
-/* Heading */
+/* Title */
 .title {
     text-align: center;
     font-size: 55px !important;
     color: #2d3436;
     font-weight: 900;
-    margin-top: -20px;
-    text-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+    margin-top: -15px;
+    text-shadow: 2px 2px 7px rgba(0,0,0,0.15);
 }
 
 /* Subtitle */
 .subtitle {
     text-align: center;
-    font-size: 18px;
+    font-size: 20px;
     color: #636e72;
-    margin-bottom: 30px;
+    margin-bottom: 25px;
 }
 
-/* Textbox */
+/* TEXTAREA FIX: TEXT NOW VISIBLE */
 .stTextArea textarea {
-    background: #ffffff;
+    background: #ffffff !important;
     padding: 18px;
     border-radius: 12px;
-    border: 2px solid #dfe6e9;
-    font-size: 16px;
-    transition: 0.2s ease;
+    border: 2px solid #b2bec3 !important;
+    font-size: 17px;
+    color: #000 !important;          /* <-- TEXT VISIBLE FIX */
+    caret-color: #000 !important;     /* cursor visible */
+    transition: 0.25s ease;
 }
+
 .stTextArea textarea:focus {
     border-color: #a29bfe !important;
     box-shadow: 0 0 0 4px rgba(162,155,254,0.3) !important;
 }
 
-/* Button Design */
+/* Center Button */
 .stButton > button {
     width: 100%;
     background: linear-gradient(90deg, #6c5ce7, #a29bfe);
@@ -72,22 +76,25 @@ html, body, [class*="css"] {
     border: none;
     transition: 0.3s ease;
 }
+
 .stButton > button:hover {
     transform: scale(1.05);
-    box-shadow: 0px 8px 20px rgba(108, 92, 231, 0.4);
+    box-shadow: 0px 8px 18px rgba(108, 92, 231, 0.4);
 }
 
-/* Result Box Animation */
+/* Result Card Animation */
 .result-card {
-    padding: 25px;
-    border-radius: 15px;
+    padding: 28px;
+    border-radius: 18px;
     text-align: center;
     animation: fadeIn 0.6s ease-in-out;
 }
+
 @keyframes fadeIn {
-  from {opacity:0; transform: translateY(20px);}
+  from {opacity:0; transform: translateY(25px);}
   to {opacity:1; transform: translateY(0);}
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -120,12 +127,12 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3209/3209994.png", width=120)
     st.header("📘 About Sentiment AI")
     st.write("""
-    This app uses a Machine Learning model to classify  
-    your text as **Positive**, **Negative**, or **Neutral**.
-    
-    ✔ Clean UI  
-    ✔ Fast prediction  
-    ✔ ML model included  
+    This app uses a Machine  
+    Learning model to classify your text as:
+
+    ✔ Positive  
+    ✔ Negative  
+    ✔ Neutral  
     """)
     st.info("Developed with ❤️ using Streamlit")
 
@@ -141,9 +148,9 @@ if model is None:
     st.stop()
 
 # Text Input
-text = st.text_area("✍️ Write something here:", placeholder="Type your message...", height=150)
+text = st.text_area("✍️ Write something here:", placeholder="Type your message...", height=140)
 
-# Center Button
+# Center the button
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     run = st.button("🚀 Analyze Now")
@@ -153,7 +160,7 @@ with col2:
 # ================================================================
 if run:
     if text.strip() == "":
-        st.warning("⚠️ Please enter text before analyzing.")
+        st.warning("⚠️ Please enter some text before analyzing.")
     else:
         with st.spinner("Analyzing sentiment... 🔍"):
             time.sleep(0.7)
@@ -180,7 +187,7 @@ if run:
             <div class="result-card" style="background:linear-gradient(135deg,#ffb199,#ff0844); color:white;">
                 <h1>😡 Negative</h1>
                 <p><b>Confidence:</b> {conf:.1f}%</p>
-                <p>The text shows negative sentiment.</p>
+                <p>The text expresses negative feelings.</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -189,6 +196,6 @@ if run:
             <div class="result-card" style="background:linear-gradient(135deg,#d7e1ec,#f2f4f7);">
                 <h1>😐 Neutral</h1>
                 <p><b>Confidence:</b> {conf:.1f}%</p>
-                <p>The message is neutral and balanced.</p>
+                <p>The message looks neutral and balanced.</p>
             </div>
             """, unsafe_allow_html=True)
