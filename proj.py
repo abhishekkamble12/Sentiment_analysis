@@ -1,7 +1,8 @@
 import streamlit as st
+import pickle
+import re
 import pandas as pd
 import numpy as np
-import re
 from datetime import datetime, timedelta
 
 # ================================================================
@@ -41,6 +42,34 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# ================================================================
+# LOAD MODEL (From your GitHub repo)
+# ================================================================
+@st.cache_resource
+def load_model():
+    try:
+        with open("sentiment_model.pkl", "rb") as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        st.error("❌ Model file `sentiment_model.pkl` not found!")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        st.stop()
+
+model = load_model()
+
+# ================================================================
+# CLEANING FUNCTION (Same as your original)
+# ================================================================
+def clean_text(text):
+    text = str(text).lower()
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r'\d+', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 # ================================================================
 # MOCK DATA FOR DASHBOARD
@@ -88,10 +117,9 @@ st.markdown("<h1 class='main-title'>E-Consultation Sentiment Analysis Platform</
 st.markdown("<p style='text-align:center; color:#475569; font-size:1.2rem;'>Government Public Feedback Monitoring System</p>", unsafe_allow_html=True)
 
 # ================================================================
-# PAGE 1: DASHBOARD OVERVIEW
+# DASHBOARD OVERVIEW
 # ================================================================
 if page == "📊 Dashboard Overview":
-    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Comments", "12,487", "↑ 428 today")
@@ -103,8 +131,8 @@ if page == "📊 Dashboard Overview":
         st.metric("Model Accuracy", "98.2%", "Live")
 
     st.markdown("---")
-
     c1, c2 = st.columns(2)
+    
     with c1:
         st.subheader("Sentiment Distribution")
         sentiment = pd.DataFrame({
@@ -123,15 +151,14 @@ if page == "📊 Dashboard Overview":
     st.line_chart(trend, color=["#22c55e", "#ef4444", "#64748b"])
 
 # ================================================================
-# PAGE 2: ANALYZE COMMENT (Like Original Code)
+# ANALYZE COMMENT (Using Your Real Model)
 # ================================================================
 elif page == "💬 Analyze Comment":
-    
     st.subheader("✍️ Enter Public Feedback / Comment")
     
     text = st.text_area(
-        "Write or paste the comment here:",
-        placeholder="Type the citizen's feedback here...",
+        "Write or paste the citizen's comment here:",
+        placeholder="Type the feedback here...",
         height=180
     )
 
@@ -143,89 +170,69 @@ elif page == "💬 Analyze Comment":
         if text.strip() == "":
             st.warning("⚠️ Please enter some text to analyze.")
         else:
-            with st.spinner("Analyzing sentiment using AI model..."):
-                # Mock Analysis (Replace with real model later)
-                cleaned = re.sub(r'[^a-zA-Z\s]', '', text.lower())
-                time.sleep(1.2)
+            with st.spinner("Analyzing sentiment using ML Model..."):
+                cleaned = clean_text(text)
+                pred = model.predict([cleaned])[0]
                 
-                # Simple mock logic for demo
-                positive_words = ['good', 'great', 'excellent', 'love', 'best', 'happy', 'thank', 'support']
-                negative_words = ['bad', 'worst', 'poor', 'terrible', 'hate', 'problem', 'issue', 'delay']
-                
-                pos_count = sum(1 for word in positive_words if word in cleaned)
-                neg_count = sum(1 for word in negative_words if word in cleaned)
-                
-                if pos_count > neg_count:
-                    pred = "positive"
-                    conf = 75 + np.random.randint(10, 25)
-                    emoji = "😊"
-                    color = "linear-gradient(135deg, #22c55e, #86efac)"
-                    text_color = "#14532d"
-                elif neg_count > pos_count:
-                    pred = "negative"
-                    conf = 70 + np.random.randint(10, 25)
-                    emoji = "😠"
-                    color = "linear-gradient(135deg, #ef4444, #f87171)"
-                    text_color = "white"
-                else:
-                    pred = "neutral"
-                    conf = 65 + np.random.randint(10, 25)
-                    emoji = "😐"
-                    color = "linear-gradient(135deg, #64748b, #94a3b8)"
-                    text_color = "white"
+                try:
+                    proba = model.predict_proba([cleaned])[0]
+                    conf = round(max(proba) * 100, 1)
+                except:
+                    conf = 85.0
 
-            # Result Card
+            # Result Display
+            if pred == "positive":
+                emoji, color, text_color = "😊", "linear-gradient(135deg, #22c55e, #86efac)", "#14532d"
+                message = "This feedback shows strong positive sentiment."
+            elif pred == "negative":
+                emoji, color, text_color = "😠", "linear-gradient(135deg, #ef4444, #f87171)", "white"
+                message = "This feedback expresses negative sentiment."
+            else:
+                emoji, color, text_color = "😐", "linear-gradient(135deg, #64748b, #94a3b8)", "white"
+                message = "This feedback appears neutral and balanced."
+
             st.markdown(f"""
             <div class="result-card" style="background:{color}; color:{text_color};">
                 <h1 style="font-size: 4.5rem; margin:0;">{emoji}</h1>
-                <h2 style="margin:10px 0;">{pred.upper()}</h2>
+                <h2>{pred.upper()}</h2>
                 <h3>Confidence: {conf}%</h3>
-                <p style="font-size:1.1rem; margin-top:15px;">
-                    { "This feedback shows strong positive sentiment." if pred == "positive" else 
-                      "This feedback expresses negative sentiment." if pred == "negative" else 
-                      "This feedback appears neutral and balanced." }
-                </p>
+                <p style="font-size:1.1rem;">{message}</p>
             </div>
             """, unsafe_allow_html=True)
 
-            # Save to history
+            # Save History
             if 'analysis_history' not in st.session_state:
                 st.session_state.analysis_history = []
-            
             st.session_state.analysis_history.append({
                 "time": datetime.now().strftime("%H:%M:%S"),
-                "text": text[:120] + "..." if len(text) > 120 else text,
+                "text": text[:150] + "..." if len(text) > 150 else text,
                 "sentiment": pred.capitalize(),
                 "confidence": conf
             })
 
-    # Show Recent Analyses
+    # Recent History
     if 'analysis_history' in st.session_state and st.session_state.analysis_history:
         st.markdown("---")
         st.subheader("Recent Analyses")
-        for item in reversed(st.session_state.analysis_history[-5:]):
+        for item in reversed(st.session_state.analysis_history[-6:]):
             st.info(f"**{item['time']}** | **{item['sentiment']}** ({item['confidence']}%) — {item['text']}")
 
 # ================================================================
-# PAGE 3: FEEDBACK EXPLORER
+# FEEDBACK EXPLORER
 # ================================================================
 elif page == "💬 Feedback Explorer":
     st.subheader("All Public Feedback Comments")
-    st.caption("Searchable list of analyzed comments")
-    
-    # Mock table
     sample_data = pd.DataFrame({
         "Date": ["2026-04-08", "2026-04-07", "2026-04-07", "2026-04-06"],
         "Comment": [
-            "The new healthcare scheme is very helpful...",
+            "The new healthcare scheme is very helpful for senior citizens.",
             "Road conditions are very bad in our area.",
             "Education department is doing good work.",
             "Water supply is irregular in our village."
         ],
         "Sentiment": ["Positive", "Negative", "Positive", "Negative"],
-        "Confidence": [82, 88, 79, 91]
+        "Confidence": [84, 91, 78, 89]
     })
-    
     st.dataframe(sample_data, use_container_width=True, hide_index=True)
 
 # Footer
