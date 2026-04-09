@@ -1,6 +1,4 @@
 import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -16,15 +14,10 @@ st.set_page_config(
 )
 
 # ================================================================
-# CUSTOM PROFESSIONAL CSS
+# CUSTOM CSS (Professional Government Look)
 # ================================================================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    .stApp {
-        background: #f8fafc;
-    }
     .main-title {
         font-size: 2.8rem;
         font-weight: 700;
@@ -32,242 +25,171 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.3rem;
     }
     .subtitle {
         text-align: center;
         color: #64748b;
         font-size: 1.25rem;
+        margin-bottom: 2rem;
     }
-    .metric-card {
+    .metric-container {
         background: white;
         padding: 1.2rem;
         border-radius: 16px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         border: 1px solid #e2e8f0;
     }
-    .stMetric {
-        background: white;
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # ================================================================
-# SESSION STATE & MOCK DATA
+# MOCK DATA
 # ================================================================
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = "📊 Dashboard Overview"
-
-# Generate mock data
 np.random.seed(42)
 dates = [datetime(2026, 3, 1) + timedelta(days=i) for i in range(30)]
 
-mock_data = pd.DataFrame({
+data = pd.DataFrame({
     'date': dates,
     'positive': np.random.randint(45, 85, 30),
     'negative': np.random.randint(8, 35, 30),
     'neutral': np.random.randint(10, 25, 30)
 })
-mock_data['total'] = mock_data['positive'] + mock_data['negative'] + mock_data['neutral']
-mock_data['approval_score'] = (mock_data['positive'] / mock_data['total'] * 100).round(1)
+data['total'] = data['positive'] + data['negative'] + data['neutral']
+data['approval'] = (data['positive'] / data['total'] * 100).round(1)
 
-# Overall stats
+# Overall Stats
 total_comments = 12487
 overall_approval = 76.4
 top_keyword = "Healthcare"
-processing_status = "98.2%"
 
-# Top keywords (mock TF-IDF)
-top_keywords = {
-    'Healthcare': 1240,
-    'Education': 980,
-    'Infrastructure': 875,
-    'Water Supply': 720,
-    'Roads': 685,
-    'Transparency': 540,
-    'Corruption': 490,
-    'Employment': 465,
-    'Pension': 410,
-    'Digital Services': 385
-}
+# Top Keywords Data
+top_keywords = pd.DataFrame({
+    'Keyword': ['Healthcare', 'Education', 'Infrastructure', 'Water Supply', 'Roads', 
+                'Transparency', 'Employment', 'Corruption', 'Pension', 'Digital Services'],
+    'Frequency': [1240, 980, 875, 720, 685, 540, 465, 490, 410, 385]
+})
 
 # ================================================================
-# SIDEBAR NAVIGATION
+# SIDEBAR
 # ================================================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3209/3209994.png", width=80)
+    st.image("https://cdn-icons-png.flaticon.com/512/3209/3209994.png", width=90)
     st.title("E-Consultation")
     st.markdown("**Public Feedback Intelligence Platform**")
     
     st.markdown("---")
     
     page = st.radio(
-        "Navigation",
-        options=["📊 Dashboard Overview", "💬 Feedback Explorer", "🧪 AI Sandbox"],
-        label_visibility="collapsed"
+        "Main Navigation",
+        ["📊 Dashboard Overview", "💬 Feedback Explorer", "🧪 AI Sandbox"]
     )
-    st.session_state.current_page = page
     
     st.markdown("---")
     st.subheader("🔍 Filters")
+    st.date_input("Date Range", value=(datetime(2026,3,1).date(), datetime.now().date()))
     
-    st.date_input("Date Range", value=(datetime(2026,3,1), datetime(2026,3,30)), key="date_range")
-    
-    sentiment_filter = st.multiselect(
+    st.multiselect(
         "Sentiment Filter",
         options=["Positive", "Negative", "Neutral"],
         default=["Positive", "Negative", "Neutral"]
     )
     
-    department = st.selectbox(
+    st.selectbox(
         "Department",
         ["All Departments", "Health", "Education", "Infrastructure", "Water", "Transport"]
     )
-    
-    st.info("✅ Live Model: RoBERTa + TF-IDF")
 
 # ================================================================
-# MAIN TITLE
+# HEADER
 # ================================================================
 st.markdown("<h1 class='main-title'>E-Consultation Sentiment Analysis</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Real-time Public Feedback Intelligence for Government Decision Making</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Real-time Public Feedback Monitoring System</p>", unsafe_allow_html=True)
 
 # ================================================================
 # DASHBOARD OVERVIEW
 # ================================================================
-if st.session_state.current_page == "📊 Dashboard Overview":
+if page == "📊 Dashboard Overview":
 
     # Top Metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric(
-            label="Total Comments Analyzed",
-            value=f"{total_comments:,}",
-            delta="+428 today",
-            delta_color="normal"
-        )
-    
+        st.metric("Total Comments", f"{total_comments:,}", "↑ 428 today")
     with col2:
-        st.metric(
-            label="Overall Approval Score",
-            value=f"{overall_approval}%",
-            delta="+2.3%",
-            delta_color="normal"
-        )
-    
+        st.metric("Overall Approval", f"{overall_approval}%", "↑ 2.3%")
     with col3:
-        st.metric(
-            label="Top Keyword",
-            value=top_keyword,
-            delta="Trending"
-        )
-    
+        st.metric("Top Keyword", top_keyword, "Trending")
     with col4:
-        st.metric(
-            label="Processing Status",
-            value=processing_status,
-            delta="Live"
-        )
+        st.metric("Processing Rate", "98.2%", "Live")
 
     st.markdown("---")
 
-    # Charts Row
-    col_left, col_right = st.columns([1, 1])
+    # Sentiment Distribution & Top Keywords
+    col_left, col_right = st.columns(2)
 
-    # 1. Sentiment Donut Chart
+    # Sentiment Distribution (Using Simple Bar + Percentages)
     with col_left:
         st.subheader("Sentiment Distribution")
-        sentiment_values = [68, 22, 10]
-        labels = ['Positive', 'Negative', 'Neutral']
-        colors = ['#22c55e', '#ef4444', '#64748b']
         
-        fig_donut = go.Figure(data=[go.Pie(
-            labels=labels,
-            values=sentiment_values,
-            hole=0.65,
-            marker=dict(colors=colors),
-            textinfo='percent+label',
-            textfont=dict(size=16)
-        )])
-        fig_donut.update_layout(
-            height=420,
-            showlegend=False,
-            margin=dict(t=40, b=20, l=20, r=20)
-        )
-        st.plotly_chart(fig_donut, use_container_width=True)
-
-    # 2. Top Keywords Horizontal Bar
-    with col_right:
-        st.subheader("Top 10 Keywords (TF-IDF)")
-        keywords_df = pd.DataFrame({
-            'Keyword': list(top_keywords.keys()),
-            'Frequency': list(top_keywords.values())
+        sentiment_data = pd.DataFrame({
+            "Sentiment": ["Positive", "Negative", "Neutral"],
+            "Count": [8520, 2750, 1217],
+            "Percentage": [68.2, 22.0, 9.8]
         })
         
-        fig_bar = px.bar(
-            keywords_df,
-            x='Frequency',
-            y='Keyword',
-            orientation='h',
-            color='Frequency',
-            color_continuous_scale='Blues',
-            text='Frequency'
+        st.bar_chart(
+            sentiment_data.set_index("Sentiment")["Count"],
+            use_container_width=True,
+            color=["#22c55e"]
         )
-        fig_bar.update_layout(
-            height=420,
-            yaxis=dict(autorange="reversed"),
-            xaxis_title="Frequency Score",
-            margin=dict(t=40, b=20, l=20, r=20)
+        
+        # Show percentages
+        for i, row in sentiment_data.iterrows():
+            st.progress(row["Percentage"]/100, text=f"{row['Sentiment']}: {row['Percentage']}%")
+
+    # Top Keywords
+    with col_right:
+        st.subheader("Top 10 Keywords")
+        # Horizontal bar using Streamlit bar_chart
+        st.bar_chart(
+            top_keywords.set_index("Keyword")["Frequency"],
+            use_container_width=True,
+            color=["#3b82f6"]
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
 
     st.markdown("---")
 
     # Trend Analysis
     st.subheader("30-Day Sentiment Trend")
     
-    fig_trend = go.Figure()
-    
-    fig_trend.add_trace(go.Scatter(
-        x=mock_data['date'], y=mock_data['positive'],
-        mode='lines+markers', name='Positive', line=dict(color='#22c55e', width=4)
-    ))
-    fig_trend.add_trace(go.Scatter(
-        x=mock_data['date'], y=mock_data['negative'],
-        mode='lines+markers', name='Negative', line=dict(color='#ef4444', width=4)
-    ))
-    fig_trend.add_trace(go.Scatter(
-        x=mock_data['date'], y=mock_data['neutral'],
-        mode='lines+markers', name='Neutral', line=dict(color='#64748b', width=4)
-    ))
-    
-    fig_trend.update_layout(
-        height=500,
-        xaxis_title="Date",
-        yaxis_title="Number of Comments",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        hovermode="x unified"
+    trend_df = data[['date', 'positive', 'negative', 'neutral']].set_index('date')
+    st.line_chart(
+        trend_df,
+        use_container_width=True,
+        color=["#22c55e", "#ef4444", "#64748b"]
     )
-    
-    st.plotly_chart(fig_trend, use_container_width=True)
 
-# Placeholder for other pages
-elif st.session_state.current_page == "💬 Feedback Explorer":
-    st.info("💬 Feedback Explorer Page - Coming in next version (with raw comments table, search, and filtering)")
+    # Summary Table
+    st.subheader("Recent Summary")
+    st.dataframe(
+        data.tail(10)[['date', 'positive', 'negative', 'neutral', 'approval']],
+        use_container_width=True,
+        hide_index=True
+    )
 
-elif st.session_state.current_page == "🧪 AI Sandbox":
-    st.info("🧪 AI Sandbox - Test custom text here (will be implemented next)")
+# Other Pages (Placeholders)
+elif page == "💬 Feedback Explorer":
+    st.info("💬 **Feedback Explorer** page is under development.\n\nIt will contain searchable comments table with filters and export option.")
+
+elif page == "🧪 AI Sandbox":
+    st.info("🧪 **AI Sandbox** coming soon.\n\nYou will be able to test live text analysis here.")
 
 # Footer
 st.markdown("---")
 st.markdown(
     "<p style='text-align: center; color: #64748b; font-size: 0.95rem;'>"
-    "E-Consultation Sentiment Analysis Platform • Government of India / State Portal • "
-    "Built with ❤️ using Streamlit + Plotly"
+    "E-Consultation Sentiment Analysis Platform • Government Stakeholder Tool"
     "</p>",
     unsafe_allow_html=True
 )
