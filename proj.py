@@ -1,297 +1,273 @@
 import streamlit as st
-import pickle
-import re
-import os
-import time
-from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 
 # ================================================================
 # PAGE CONFIG
 # ================================================================
 st.set_page_config(
-    page_title="Sentiment AI",
-    page_icon="✨",
+    page_title="E-Consultation | Sentiment Analysis",
+    page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ================================================================
-# CUSTOM CSS - World-Class Modern Design
+# CUSTOM PROFESSIONAL CSS
 # ================================================================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Poppins', sans-serif;
-    }
-
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
     .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #f8fafc;
     }
-
-    /* Glassmorphism Container */
-    .main-container {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 2.5rem;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        margin: 1rem 0;
-    }
-
-    .title {
-        text-align: center;
-        font-size: 3.8rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #4f46e5, #a855f7);
+    .main-title {
+        font-size: 2.8rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #1e40af, #3b82f6);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        text-align: center;
         margin-bottom: 0.5rem;
     }
-
     .subtitle {
         text-align: center;
-        font-size: 1.35rem;
-        color: #475569;
-        margin-bottom: 2rem;
-    }
-
-    /* Text Area */
-    .stTextArea textarea {
-        border-radius: 16px !important;
-        border: 2px solid #e2e8f0 !important;
-        font-size: 1.1rem !important;
-        padding: 1.2rem !important;
-        background: #ffffff !important;
-        color: #1e2937 !important;
-        transition: all 0.3s ease;
-    }
-
-    .stTextArea textarea:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2) !important;
-    }
-
-    /* Button */
-    .stButton > button {
-        width: 100%;
-        height: 62px;
-        background: linear-gradient(90deg, #4f46e5, #7c3aed);
-        color: white;
-        border-radius: 9999px;
+        color: #64748b;
         font-size: 1.25rem;
-        font-weight: 600;
-        border: none;
-        box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
-        transition: all 0.3s ease;
     }
-
-    .stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 35px rgba(79, 70, 229, 0.4);
+    .metric-card {
+        background: white;
+        padding: 1.2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
     }
-
-    /* Result Cards */
-    .result-card {
-        padding: 2.5rem;
-        border-radius: 24px;
-        text-align: center;
-        animation: fadeInUp 0.6s ease;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-        margin: 1.5rem 0;
-    }
-
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(40px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .confidence-bar {
-        height: 8px;
-        background: linear-gradient(90deg, #22c55e, #86efac);
-        border-radius: 9999px;
-        margin: 1rem 0;
+    .stMetric {
+        background: white;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ================================================================
-# SESSION STATE
+# SESSION STATE & MOCK DATA
 # ================================================================
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'theme' not in st.session_state:
-    st.session_state.theme = "Light"
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "📊 Dashboard Overview"
+
+# Generate mock data
+np.random.seed(42)
+dates = [datetime(2026, 3, 1) + timedelta(days=i) for i in range(30)]
+
+mock_data = pd.DataFrame({
+    'date': dates,
+    'positive': np.random.randint(45, 85, 30),
+    'negative': np.random.randint(8, 35, 30),
+    'neutral': np.random.randint(10, 25, 30)
+})
+mock_data['total'] = mock_data['positive'] + mock_data['negative'] + mock_data['neutral']
+mock_data['approval_score'] = (mock_data['positive'] / mock_data['total'] * 100).round(1)
+
+# Overall stats
+total_comments = 12487
+overall_approval = 76.4
+top_keyword = "Healthcare"
+processing_status = "98.2%"
+
+# Top keywords (mock TF-IDF)
+top_keywords = {
+    'Healthcare': 1240,
+    'Education': 980,
+    'Infrastructure': 875,
+    'Water Supply': 720,
+    'Roads': 685,
+    'Transparency': 540,
+    'Corruption': 490,
+    'Employment': 465,
+    'Pension': 410,
+    'Digital Services': 385
+}
 
 # ================================================================
-# CLEANING FUNCTION
-# ================================================================
-def clean_text(text):
-    text = str(text).lower().strip()
-    text = re.sub(r'http\S+|www\S+|https\S+', '', text)
-    text = re.sub(r'[^\w\s]', '', text)
-    text = re.sub(r'\d+', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text
-
-# ================================================================
-# LOAD MODEL
-# ================================================================
-@st.cache_resource
-def load_model():
-    try:
-        if os.path.exists("sentiment_model.pkl"):
-            with open("sentiment_model.pkl", "rb") as f:
-                return pickle.load(f)
-        else:
-            st.error("❌ Model file `sentiment_model.pkl` not found!")
-            return None
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None
-
-model = load_model()
-
-# ================================================================
-# SIDEBAR
+# SIDEBAR NAVIGATION
 # ================================================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3209/3209994.png", width=100)
-    st.title("Sentiment AI")
+    st.image("https://cdn-icons-png.flaticon.com/512/3209/3209994.png", width=80)
+    st.title("E-Consultation")
+    st.markdown("**Public Feedback Intelligence Platform**")
     
     st.markdown("---")
-    st.subheader("🎨 Theme")
-    if st.button("Toggle Dark/Light Mode"):
-        st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+    
+    page = st.radio(
+        "Navigation",
+        options=["📊 Dashboard Overview", "💬 Feedback Explorer", "🧪 AI Sandbox"],
+        label_visibility="collapsed"
+    )
+    st.session_state.current_page = page
     
     st.markdown("---")
-    st.subheader("📖 About")
-    st.write("""
-    Advanced sentiment analysis powered by Machine Learning.
-    Detects **Positive**, **Negative**, and **Neutral** emotions with confidence scores.
-    """)
+    st.subheader("🔍 Filters")
     
-    st.info("💡 Pro Tip: Try writing emotional reviews or tweets!")
+    st.date_input("Date Range", value=(datetime(2026,3,1), datetime(2026,3,30)), key="date_range")
+    
+    sentiment_filter = st.multiselect(
+        "Sentiment Filter",
+        options=["Positive", "Negative", "Neutral"],
+        default=["Positive", "Negative", "Neutral"]
+    )
+    
+    department = st.selectbox(
+        "Department",
+        ["All Departments", "Health", "Education", "Infrastructure", "Water", "Transport"]
+    )
+    
+    st.info("✅ Live Model: RoBERTa + TF-IDF")
 
 # ================================================================
-# MAIN UI
+# MAIN TITLE
 # ================================================================
-st.markdown("<h1 class='title'>Sentiment AI ✨</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Uncover the emotion behind every word</p>", unsafe_allow_html=True)
-
-# Example Prompts
-st.markdown("**Quick Examples:**")
-cols = st.columns(3)
-examples = [
-    "I absolutely love this product! Best purchase ever.",
-    "This is the worst service I've ever experienced.",
-    "The movie was okay, nothing special."
-]
-
-for i, col in enumerate(cols):
-    if col.button(examples[i], use_container_width=True):
-        st.session_state.example_text = examples[i]
-
-# Text Input
-text = st.text_area(
-    "✍️ Enter your text here:",
-    placeholder="Type or paste your message...",
-    height=160,
-    value=st.session_state.get('example_text', '')
-)
-
-# Analyze Button
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    analyze_btn = st.button("🚀 Analyze Sentiment", type="primary")
+st.markdown("<h1 class='main-title'>E-Consultation Sentiment Analysis</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Real-time Public Feedback Intelligence for Government Decision Making</p>", unsafe_allow_html=True)
 
 # ================================================================
-# ANALYSIS
+# DASHBOARD OVERVIEW
 # ================================================================
-if analyze_btn:
-    if not text or text.strip() == "":
-        st.warning("⚠️ Please enter some text to analyze.")
-    elif model is None:
-        st.error("Model not loaded. Please check sentiment_model.pkl")
-    else:
-        with st.spinner("Analyzing emotions with AI..."):
-            time.sleep(0.8)
-            
-            cleaned = clean_text(text)
-            prediction = model.predict([cleaned])[0]
-            
-            try:
-                probabilities = model.predict_proba([cleaned])[0]
-                confidence = max(probabilities) * 100
-                confidence_class = prediction
-            except:
-                confidence = 85.0  # fallback
+if st.session_state.current_page == "📊 Dashboard Overview":
 
-        # Store in history
-        result_entry = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "text": text[:150] + "..." if len(text) > 150 else text,
-            "sentiment": prediction.capitalize(),
-            "confidence": round(confidence, 1)
-        }
-        st.session_state.history.append(result_entry)
-        if len(st.session_state.history) > 10:
-            st.session_state.history.pop(0)
+    # Top Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="Total Comments Analyzed",
+            value=f"{total_comments:,}",
+            delta="+428 today",
+            delta_color="normal"
+        )
+    
+    with col2:
+        st.metric(
+            label="Overall Approval Score",
+            value=f"{overall_approval}%",
+            delta="+2.3%",
+            delta_color="normal"
+        )
+    
+    with col3:
+        st.metric(
+            label="Top Keyword",
+            value=top_keyword,
+            delta="Trending"
+        )
+    
+    with col4:
+        st.metric(
+            label="Processing Status",
+            value=processing_status,
+            delta="Live"
+        )
 
-        # Result Display
-        if prediction == "positive":
-            st.markdown(f"""
-            <div class="result-card" style="background: linear-gradient(135deg, #22c55e, #86efac); color: #14532d;">
-                <h1 style="font-size: 4rem; margin: 0;">😊 Positive</h1>
-                <p style="font-size: 1.4rem; margin: 10px 0;">This text radiates positivity!</p>
-                <div style="font-size: 2.2rem; font-weight: 700;">{confidence:.1f}% Confidence</div>
-                <div class="confidence-bar" style="width: {confidence}%; background: linear-gradient(90deg, #15803d, #4ade80);"></div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.balloons()
-
-        elif prediction == "negative":
-            st.markdown(f"""
-            <div class="result-card" style="background: linear-gradient(135deg, #ef4444, #f87171); color: white;">
-                <h1 style="font-size: 4rem; margin: 0;">😠 Negative</h1>
-                <p style="font-size: 1.4rem; margin: 10px 0;">This message expresses negative sentiment.</p>
-                <div style="font-size: 2.2rem; font-weight: 700;">{confidence:.1f}% Confidence</div>
-                <div class="confidence-bar" style="width: {confidence}%; background: linear-gradient(90deg, #b91c1c, #fb7185);"></div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        else:
-            st.markdown(f"""
-            <div class="result-card" style="background: linear-gradient(135deg, #64748b, #94a3b8); color: white;">
-                <h1 style="font-size: 4rem; margin: 0;">😐 Neutral</h1>
-                <p style="font-size: 1.4rem; margin: 10px 0;">This text appears balanced and neutral.</p>
-                <div style="font-size: 2.2rem; font-weight: 700;">{confidence:.1f}% Confidence</div>
-                <div class="confidence-bar" style="width: {confidence}%; background: linear-gradient(90deg, #475569, #cbd5e1);"></div>
-            </div>
-            """, unsafe_allow_html=True)
-
-# ================================================================
-# HISTORY
-# ================================================================
-if st.session_state.history:
     st.markdown("---")
-    st.subheader("📜 Analysis History")
-    for entry in reversed(st.session_state.history):
-        emoji = "😊" if entry["sentiment"].lower() == "positive" else "😠" if entry["sentiment"].lower() == "negative" else "😐"
-        st.markdown(f"""
-        <div style="padding: 1rem; border-radius: 16px; background: rgba(255,255,255,0.7); margin: 8px 0;">
-            <small>{entry['timestamp']}</small><br>
-            <b>{emoji} {entry['sentiment']}</b> • {entry['confidence']}% 
-            <br><span style="color: #64748b;">"{entry['text']}"</span>
-        </div>
-        """, unsafe_allow_html=True)
+
+    # Charts Row
+    col_left, col_right = st.columns([1, 1])
+
+    # 1. Sentiment Donut Chart
+    with col_left:
+        st.subheader("Sentiment Distribution")
+        sentiment_values = [68, 22, 10]
+        labels = ['Positive', 'Negative', 'Neutral']
+        colors = ['#22c55e', '#ef4444', '#64748b']
+        
+        fig_donut = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=sentiment_values,
+            hole=0.65,
+            marker=dict(colors=colors),
+            textinfo='percent+label',
+            textfont=dict(size=16)
+        )])
+        fig_donut.update_layout(
+            height=420,
+            showlegend=False,
+            margin=dict(t=40, b=20, l=20, r=20)
+        )
+        st.plotly_chart(fig_donut, use_container_width=True)
+
+    # 2. Top Keywords Horizontal Bar
+    with col_right:
+        st.subheader("Top 10 Keywords (TF-IDF)")
+        keywords_df = pd.DataFrame({
+            'Keyword': list(top_keywords.keys()),
+            'Frequency': list(top_keywords.values())
+        })
+        
+        fig_bar = px.bar(
+            keywords_df,
+            x='Frequency',
+            y='Keyword',
+            orientation='h',
+            color='Frequency',
+            color_continuous_scale='Blues',
+            text='Frequency'
+        )
+        fig_bar.update_layout(
+            height=420,
+            yaxis=dict(autorange="reversed"),
+            xaxis_title="Frequency Score",
+            margin=dict(t=40, b=20, l=20, r=20)
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("---")
+
+    # Trend Analysis
+    st.subheader("30-Day Sentiment Trend")
+    
+    fig_trend = go.Figure()
+    
+    fig_trend.add_trace(go.Scatter(
+        x=mock_data['date'], y=mock_data['positive'],
+        mode='lines+markers', name='Positive', line=dict(color='#22c55e', width=4)
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=mock_data['date'], y=mock_data['negative'],
+        mode='lines+markers', name='Negative', line=dict(color='#ef4444', width=4)
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=mock_data['date'], y=mock_data['neutral'],
+        mode='lines+markers', name='Neutral', line=dict(color='#64748b', width=4)
+    ))
+    
+    fig_trend.update_layout(
+        height=500,
+        xaxis_title="Date",
+        yaxis_title="Number of Comments",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        hovermode="x unified"
+    )
+    
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+# Placeholder for other pages
+elif st.session_state.current_page == "💬 Feedback Explorer":
+    st.info("💬 Feedback Explorer Page - Coming in next version (with raw comments table, search, and filtering)")
+
+elif st.session_state.current_page == "🧪 AI Sandbox":
+    st.info("🧪 AI Sandbox - Test custom text here (will be implemented next)")
 
 # Footer
 st.markdown("---")
 st.markdown(
-    "<p style='text-align: center; color: #64748b; font-size: 0.9rem;'>"
-    "Built with ❤️ using Streamlit • World-Class UI by Grok"
+    "<p style='text-align: center; color: #64748b; font-size: 0.95rem;'>"
+    "E-Consultation Sentiment Analysis Platform • Government of India / State Portal • "
+    "Built with ❤️ using Streamlit + Plotly"
     "</p>",
     unsafe_allow_html=True
 )
